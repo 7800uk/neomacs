@@ -1089,6 +1089,38 @@ fn font_xlfd_name_returns_xlfd() {
     assert_eq!(result.as_utf8_str(), Some("-*-*-*-*-*-*-*-*-*-*-*-*-*-*"));
 }
 
+/// GNU `font_unparse_xlfd` (src/font.c) copies the weight, slant AND width
+/// style names "while excluding '-', '?', ',', and '\"'", because a dash
+/// inside a field would add a field to the XLFD.  A width left as
+/// `semi-condensed` produced a name `font-spec`, `font-info` and
+/// `make-frame` all reject as "Invalid font name".
+#[test]
+fn font_xlfd_name_strips_dashes_from_every_style_field() {
+    crate::test_utils::init_test_tracing();
+
+    let spec = font_spec(vec![
+        Value::keyword("weight"),
+        Value::symbol("ultra-light"),
+        Value::keyword("slant"),
+        Value::symbol("reverse-italic"),
+        Value::keyword("width"),
+        Value::symbol("semi-condensed"),
+    ])
+    .expect("valid style spec");
+    let name = font_xlfd_name(vec![spec]).expect("xlfd");
+    let name = name.as_utf8_str().expect("xlfd string").to_owned();
+    assert_eq!(
+        name,
+        "-*-*-ultralight-reverseitalic-semicondensed-*-*-*-*-*-*-*-*-*"
+    );
+
+    // The name must read back: that is what frame parameters and
+    // `face-font' hand to `font-spec', `font-info' and `make-frame'.
+    let reparsed = font_spec(vec![Value::keyword("name"), Value::string(name)])
+        .expect("an XLFD this module printed must parse");
+    assert!(is_font(&reparsed));
+}
+
 #[test]
 fn font_xlfd_name_uses_gnu_spacing_buckets() {
     crate::test_utils::init_test_tracing();

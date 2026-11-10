@@ -1485,7 +1485,11 @@ fn xlfd_fields_from_font_vector(
     let set_width = font_vector_get_flexible(v, "set-width")
         .or_else(|| font_vector_get_flexible(v, "setwidth"))
         .or_else(|| font_vector_get_flexible(v, "width"))
-        .map(|value| font_spec_field_to_string(&value))
+        // GNU `font_unparse_xlfd' runs weight, slant AND width through one
+        // loop that copies the style name "while excluding '-', '?', ','
+        // and '\"'" (src/font.c:1514-1538): `semi-condensed' prints as
+        // `semicondensed'.  A dash left in would add a field to the name.
+        .map(|value| sanitize_style_field(&value))
         .unwrap_or_else(|| "*".to_string());
     let adstyle = font_vector_get_flexible(v, "adstyle")
         .map(|value| font_spec_field_to_string(&value))

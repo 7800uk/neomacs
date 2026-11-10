@@ -862,6 +862,87 @@ fn gui_window_fringes_and_margins_read_new_values_before_redisplay() {
     );
 }
 
+/// GNU `window_body_width` (src/window.c) subtracts the window's own margin
+/// and fringe fields from its pixel width, so `set-window-margins' and
+/// `set-window-fringes' change `window-body-width' at once.  Olivetti resets
+/// the margins and reads the body width in the same command; a width still
+/// taken from the last redisplay made it compute margins of zero.
+#[test]
+fn gui_window_body_width_follows_margins_and_fringes_before_redisplay() {
+    crate::test_utils::init_test_tracing();
+    let mut ev = Context::new(crate::test_utils::unit_runtime());
+    let buf = ev.edit.buffers.create_buffer("*scratch*");
+    ev.edit.buffers.set_current(buf);
+    let fid = ev.frame_manager_mut().create_frame("F1", 800, 600, buf);
+    ev.frame_manager_mut()
+        .get_mut(fid)
+        .expect("frame")
+        .set_window_system(Some(Value::symbol("neo")));
+    let char_width = ev.frame_manager().get(fid).expect("frame").char_width as i64;
+    let body_width = |ev: &mut Context| {
+        super::builtin_window_body_width(ev, &vec![Value::NIL, Value::T])
+            .expect("window-body-width")
+            .as_fixnum()
+            .expect("pixel width")
+    };
+    let text_width = |ev: &mut Context| {
+        super::builtin_window_text_width(ev, vec![Value::NIL, Value::T])
+            .expect("window-text-width")
+            .as_fixnum()
+            .expect("pixel width")
+    };
+
+    super::builtin_set_window_fringes(
+        &mut ev,
+        vec![Value::NIL, Value::fixnum(8), Value::fixnum(8)],
+    )
+    .expect("initial fringes");
+    super::builtin_set_window_margins(
+        &mut ev,
+        vec![Value::NIL, Value::fixnum(8), Value::fixnum(8)],
+    )
+    .expect("initial margins");
+    let with_margins = body_width(&mut ev);
+    publish_selected_gui_window_regions(
+        &mut ev,
+        fid,
+        1,
+        crate::window::PresentedWindowRegions {
+            outer: neomacs_display_protocol::types::Rect::new(0.0, 0.0, 800.0, 600.0),
+            text_body: neomacs_display_protocol::types::Rect::new(
+                8.0 + 8.0 * char_width as f32,
+                0.0,
+                with_margins as f32,
+                568.0,
+            ),
+            left_margin_columns: 8,
+            right_margin_columns: 8,
+            left_fringe: Some(neomacs_display_protocol::types::Rect::new(
+                0.0, 0.0, 8.0, 568.0,
+            )),
+            right_fringe: Some(neomacs_display_protocol::types::Rect::new(
+                784.0, 0.0, 8.0, 568.0,
+            )),
+            ..Default::default()
+        },
+    );
+    assert_eq!(body_width(&mut ev), with_margins);
+
+    super::builtin_set_window_margins(&mut ev, vec![Value::NIL, Value::NIL, Value::NIL])
+        .expect("reset margins");
+    let without_margins = with_margins + 16 * char_width;
+    assert_eq!(body_width(&mut ev), without_margins);
+    assert_eq!(text_width(&mut ev), without_margins);
+
+    super::builtin_set_window_fringes(
+        &mut ev,
+        vec![Value::NIL, Value::fixnum(20), Value::fixnum(30)],
+    )
+    .expect("wider fringes");
+    assert_eq!(body_width(&mut ev), without_margins - (20 + 30 - 16));
+    assert_eq!(text_width(&mut ev), without_margins - (20 + 30 - 16));
+}
+
 #[test]
 fn gui_window_fringes_default_to_frame_defaults_when_reset() {
     crate::test_utils::init_test_tracing();

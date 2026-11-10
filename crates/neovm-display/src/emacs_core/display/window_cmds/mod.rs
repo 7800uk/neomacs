@@ -1913,6 +1913,40 @@ pub(crate) fn window_body_width_pixels(frames: &FrameManager, fid: FrameId, w: &
     total.saturating_sub(left.saturating_add(right))
 }
 
+/// Text-area width `window-body-width' and `window-text-width' report.
+///
+/// GNU `window_body_width' (src/window.c:1096-1111) subtracts the window's
+/// own divider, scroll-bar, margin and fringe fields from its pixel width; it
+/// never consults the last redisplay.  So `set-window-margins' and
+/// `set-window-fringes' change the answer at once -- Olivetti resets the
+/// margins and reads the body width back in the same command.
+///
+/// The width the last redisplay published is the same quantity as laid out,
+/// and stays the answer while it describes the window as it is now.  Once the
+/// margins or fringes it was laid out with differ from the window's own, it
+/// describes a window that no longer exists, and the width comes from the
+/// window's state as GNU's does.
+fn text_body_width_pixels(
+    frames: &FrameManager,
+    fid: FrameId,
+    wid: WindowId,
+    window: &Window,
+) -> Result<i64, Flow> {
+    if let Some(regions) = published_window_regions(frames, fid, wid)?
+        && let Window::Leaf { margins, .. } = window
+    {
+        let (left_fringe, right_fringe, _, _) =
+            frames.window_fringes(wid).unwrap_or((0, 0, false, false));
+        let laid_out_as_now = regions.left_margin_columns() == margins.left() as i64
+            && regions.right_margin_columns() == margins.right() as i64
+            && published_geometry(regions.fringe_widths_pixels())? == (left_fringe, right_fringe);
+        if laid_out_as_now {
+            return published_geometry(regions.text_body_width_pixels());
+        }
+    }
+    Ok(window_body_width_pixels(frames, fid, window))
+}
+
 fn is_minibuffer_window(frames: &FrameManager, fid: FrameId, wid: WindowId) -> bool {
     frames
         .get(fid)
@@ -4395,10 +4429,7 @@ pub fn builtin_window_body_width(
     )?;
     let remapped = remapped_window_body_cell_size(eval, fid, unit);
     let window = get_leaf(&eval.frame_manager(), fid, wid)?;
-    let pixels = match published_window_regions(&eval.frame_manager(), fid, wid)? {
-        Some(regions) => published_geometry(regions.text_body_width_pixels())?,
-        None => window_body_width_pixels(&eval.frame_manager(), fid, window),
-    };
+    let pixels = text_body_width_pixels(&eval.frame_manager(), fid, wid, window)?;
     Ok(Value::fixnum(unit.measure(
         WindowBodyAxis::Width,
         pixels,
@@ -4445,21 +4476,17 @@ pub fn builtin_window_text_width(
         resolve_window_id_with_pred_in_state(frames, buffers, args.first(), WindowDomain::Live)?;
     let w = get_leaf(frames, fid, wid)?;
     let pixelwise = args.get(1).is_some_and(|v| v.is_truthy());
+    // GNU's `window-text-width' is `window_box_width (w, TEXT_AREA)'
+    // (src/window.c:7459-7480), computed from the window's own state like
+    // `window_body_width'.
+    let width = text_body_width_pixels(frames, fid, wid, w)?;
     if pixelwise {
-        let width = match published_window_regions(frames, fid, wid)? {
-            Some(regions) => published_geometry(regions.text_body_width_pixels())?,
-            None => window_body_width_pixels(frames, fid, w),
-        };
         Ok(Value::fixnum(width))
     } else {
         let cw = frames
             .get(fid)
             .map(|f| f.char_width.max(1.0))
             .unwrap_or(8.0);
-        let width = match published_window_regions(frames, fid, wid)? {
-            Some(regions) => published_geometry(regions.text_body_width_pixels())?,
-            None => window_body_width_pixels(frames, fid, w),
-        };
         Ok(Value::fixnum((width as f32 / cw).floor() as i64))
     }
 }

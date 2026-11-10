@@ -8104,6 +8104,17 @@ pub(crate) fn x_create_frame_impl(
             fullscreen: parsed.fullscreen,
         })
         .map_err(|message| signal("error", vec![Value::string(message)]))?;
+        // GNU's `Fx_create_frame' reads `ns-appearance' from the creation
+        // parameters before the window is shown (src/nsfns.m:1407-1412).
+        let ns_appearance = frames
+            .get(fid)
+            .and_then(|frame| frame.known_parameter(FrameParam::NsAppearance))
+            .map(|value| neovm_value::display_vocab::FrameNsAppearance::from_symbol_value(&value))
+            .unwrap_or_default();
+        if ns_appearance != neovm_value::display_vocab::FrameNsAppearance::SystemDefault {
+            host.set_gui_frame_ns_appearance(fid, ns_appearance)
+                .map_err(|message| signal("error", vec![Value::string(message)]))?;
+        }
     }
     if is_child_frame {
         tracing::info!(

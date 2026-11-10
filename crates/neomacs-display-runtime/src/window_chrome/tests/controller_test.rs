@@ -7,6 +7,7 @@ fn native_background_is_restored_after_an_external_style_reset() {
     let desired = NativeAppearance {
         policy: WindowChromePolicy::Native(NativeTitlebarStyle::FrameBackground),
         background: Color::rgb(1.0, 0.0, 1.0),
+        appearance: crate::thread_comm::WindowAppearance::System,
     };
     let mut native_background = Color::BLACK;
     chrome
@@ -33,6 +34,7 @@ fn failed_native_application_remains_retryable_and_frames_are_independent() {
     let desired = NativeAppearance {
         policy: WindowChromePolicy::Native(NativeTitlebarStyle::Overlay),
         background: Color::rgb(1.0, 0.0, 1.0),
+        appearance: crate::thread_comm::WindowAppearance::System,
     };
     let mut primary = WindowChromeController::default();
     let mut secondary = WindowChromeController::default();
@@ -76,4 +78,44 @@ fn failed_native_application_remains_retryable_and_frames_are_independent() {
         .unwrap();
     assert_eq!(primary_color, Color::WHITE);
     assert_eq!(secondary_color, desired.background);
+}
+
+/// GNU `ns_set_appearance' restyles the window whenever `ns-appearance'
+/// changes (src/nsterm.m:2130-2146).  The appearance is part of the applied
+/// native state, so changing only it must reach the native window, and an
+/// unchanged one must not be reapplied.
+#[test]
+fn an_appearance_change_alone_is_applied_natively() {
+    use crate::thread_comm::WindowAppearance;
+
+    let mut chrome = WindowChromeController::default();
+    let system = NativeAppearance {
+        policy: WindowChromePolicy::Native(NativeTitlebarStyle::Overlay),
+        background: Color::BLACK,
+        appearance: WindowAppearance::System,
+    };
+    let dark = NativeAppearance {
+        appearance: WindowAppearance::Dark,
+        ..system
+    };
+    let mut native = None;
+    chrome
+        .apply(system, |applied| {
+            native = Some(applied.appearance);
+            Ok::<_, ()>(())
+        })
+        .unwrap();
+    assert_eq!(native, Some(WindowAppearance::System));
+    chrome
+        .apply(dark, |applied| {
+            native = Some(applied.appearance);
+            Ok::<_, ()>(())
+        })
+        .unwrap();
+    assert_eq!(native, Some(WindowAppearance::Dark));
+    chrome
+        .apply(dark, |_| {
+            panic!("unchanged appearance must not be reapplied")
+        })
+        .unwrap_or_else(|_: ()| unreachable!());
 }

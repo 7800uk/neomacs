@@ -1361,6 +1361,9 @@ struct GuiStartupParameters {
     /// published.  Held here like the rest of `pending_request`, so a frame
     /// abandoned before publication leaves nothing for a later one to inherit.
     pending_position: Option<(i32, i32)>,
+    /// `ns-appearance` set on the primary frame before its window was
+    /// published, held like `pending_position`.
+    pending_appearance: Option<neomacs_display_runtime::thread_comm::WindowAppearance>,
 }
 
 #[derive(Clone)]
@@ -1788,6 +1791,15 @@ impl DisplayHost for PrimaryWindowDisplayHost {
                 "failed to finalize initial GUI frame",
             )?;
         }
+        if let Some(appearance) = startup.pending_appearance {
+            self.send_render_command(
+                RenderCommand::Window(WindowCommand::SetWindowAppearance {
+                    frame: FrameRef::Primary,
+                    appearance,
+                }),
+                "failed to finalize initial GUI frame",
+            )?;
+        }
         startup.publisher.complete(
             neomacs_display_runtime::render_thread::InitialWindowPreparation {
                 size: neomacs_display_runtime::render_thread::InitialWindowSize {
@@ -2052,6 +2064,7 @@ impl DisplayHost for PrimaryWindowDisplayHost {
                     .map_err(|error| error.to_string())? = None;
                 startup.pending_request = None;
                 startup.pending_position = None;
+                startup.pending_appearance = None;
                 self.primary_frame = PrimaryFrame::Awaiting;
                 return Ok(());
             }
@@ -2304,6 +2317,32 @@ impl DisplayHost for PrimaryWindowDisplayHost {
         self.send_render_command(
             RenderCommand::Window(WindowCommand::SetWindowPosition { frame, x, y }),
             "failed to move GUI frame",
+        )
+    }
+
+    fn set_gui_frame_ns_appearance(
+        &mut self,
+        frame_id: neovm_core::window::FrameId,
+        appearance: neovm_core::window::FrameNsAppearance,
+    ) -> Result<(), String> {
+        use neomacs_display_runtime::thread_comm::WindowAppearance;
+        use neovm_core::window::FrameNsAppearance;
+
+        let appearance = match appearance {
+            FrameNsAppearance::Dark => WindowAppearance::Dark,
+            FrameNsAppearance::Light => WindowAppearance::Light,
+            FrameNsAppearance::SystemDefault => WindowAppearance::System,
+        };
+        if self.pending_primary_request_mut(frame_id).is_some()
+            && let Some(startup) = self.gui_startup.as_mut()
+        {
+            startup.pending_appearance = Some(appearance);
+            return Ok(());
+        }
+        let frame = self.frame_ref_for_gui_frame(frame_id);
+        self.send_render_command(
+            RenderCommand::Window(WindowCommand::SetWindowAppearance { frame, appearance }),
+            "failed to update GUI frame appearance",
         )
     }
 
@@ -4293,6 +4332,7 @@ fn run_gui_evaluator_worker(
             primary_frame: Arc::clone(&primary_frame),
             pending_request: None,
             pending_position: None,
+            pending_appearance: None,
         }),
         last_window_titles: Mutex::new(HashMap::new()),
         font_metrics: None,

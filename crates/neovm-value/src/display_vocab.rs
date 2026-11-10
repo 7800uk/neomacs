@@ -132,6 +132,28 @@ impl FrameFullscreen {
     }
 }
 
+/// GNU's `ns-appearance` frame parameter, as `ns_set_appearance_1` reads it
+/// (src/nsterm.m:2119-2128): the symbol `dark` selects the dark appearance,
+/// `light` the light one, and every other value -- nil included -- follows
+/// the system setting.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum FrameNsAppearance {
+    Dark,
+    Light,
+    #[default]
+    SystemDefault,
+}
+
+impl FrameNsAppearance {
+    pub fn from_symbol_value(value: &Value) -> Self {
+        match value.as_bare_symbol_name() {
+            Some("dark") => Self::Dark,
+            Some("light") => Self::Light,
+            _ => Self::SystemDefault,
+        }
+    }
+}
+
 /// A frame's display output method, as GNU's `framep` vocabulary spells it.
 ///
 /// This is the frame's INTERNAL output method: the backend installs it when

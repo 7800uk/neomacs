@@ -12,6 +12,7 @@ pub(crate) struct WindowChromeController {
 pub(super) struct NativeAppearance {
     pub policy: WindowChromePolicy,
     pub background: Color,
+    pub appearance: crate::thread_comm::WindowAppearance,
 }
 
 impl WindowChromeController {
@@ -35,13 +36,20 @@ impl WindowChromeController {
         self.applied = None;
     }
 
-    pub fn synchronize(&mut self, window: &dyn Window, decorated: bool, background: Color) {
+    pub fn synchronize(
+        &mut self,
+        window: &dyn Window,
+        decorated: bool,
+        background: Color,
+        appearance: crate::thread_comm::WindowAppearance,
+    ) {
         let desired = NativeAppearance {
             policy: Self::policy(decorated),
             background,
+            appearance,
         };
-        if let Err(error) = self.apply(desired, |appearance| {
-            super::platform::apply(window, appearance.policy, appearance.background)
+        if let Err(error) = self.apply(desired, |native| {
+            super::platform::apply(window, native.policy, native.background, native.appearance)
         }) {
             tracing::error!(?error, "could not apply native frame chrome");
         }

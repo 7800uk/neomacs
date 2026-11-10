@@ -1541,6 +1541,7 @@ impl GuiFrameWindowState {
                 native.window.as_ref(),
                 native.chrome.decorations_enabled,
                 frame.background,
+                native.chrome.appearance,
             );
         }
         native.refresh_content_geometry();
@@ -1654,6 +1655,14 @@ impl GuiFrameWindowState {
                 chrome.title = title;
             }
         }
+    }
+
+    /// Record the `ns-appearance` request.  A window that does not exist yet
+    /// keeps it in its pending chrome; either way the next chrome
+    /// synchronization applies it natively.
+    pub(super) fn set_appearance(&mut self, appearance: crate::thread_comm::WindowAppearance) {
+        self.chrome_mut().appearance = appearance;
+        self.render.compositor.dirty = true;
     }
 
     pub(super) fn set_fullscreen_mode(&mut self, mode: WindowFullscreenMode) {

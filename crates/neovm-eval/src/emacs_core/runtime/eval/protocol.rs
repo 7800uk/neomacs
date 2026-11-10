@@ -425,6 +425,19 @@ pub trait DisplayHost {
     ) -> Result<(), String> {
         Ok(())
     }
+    /// Apply the `ns-appearance` frame parameter to the platform window.
+    ///
+    /// GNU's NS port sets the window's `NSAppearance` from it
+    /// (`ns_set_appearance`, src/nsterm.m:2130-2146), which is what colours
+    /// the title bar's text and buttons.  As with `undecorated`, the caller
+    /// stores the parameter whatever this returns.
+    fn set_gui_frame_ns_appearance(
+        &mut self,
+        _frame_id: FrameId,
+        _appearance: neovm_value::display_vocab::FrameNsAppearance,
+    ) -> Result<(), String> {
+        Ok(())
+    }
     /// Apply each accepted legacy alpha operation synchronously, independently
     /// of replaceable scene transport. Negative components mean retain.
     fn set_gui_frame_alpha(

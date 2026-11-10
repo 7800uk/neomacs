@@ -302,6 +302,17 @@ impl From<FrameRef> for u64 {
     }
 }
 
+/// Native-window projection of GNU's `ns-appearance` frame parameter: which
+/// system appearance draws the window's title bar text and buttons.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum WindowAppearance {
+    Dark,
+    Light,
+    /// Follow the system setting.
+    #[default]
+    System,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowFullscreenMode {
     None,
@@ -380,6 +391,13 @@ pub enum WindowCommand {
     SetWindowFullscreen {
         frame: FrameRef,
         mode: WindowFullscreenMode,
+    },
+    /// Select the system appearance of a GUI frame window's title bar -- the
+    /// `ns-appearance` frame parameter.
+    /// `frame.raw_id() == 0` also targets the adopted primary window.
+    SetWindowAppearance {
+        frame: FrameRef,
+        appearance: WindowAppearance,
     },
     /// Show or hide the window manager's title bar and border -- the
     /// `undecorated` frame parameter.

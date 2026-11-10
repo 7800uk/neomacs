@@ -150,6 +150,17 @@ impl RenderApp {
                     );
                 }
             }
+            WindowCommand::SetWindowAppearance { frame, appearance } => {
+                let emacs_frame_id = frame.raw_id();
+                if let Some(window_state) = self.frame_windows.get_mut(emacs_frame_id) {
+                    window_state.set_appearance(appearance);
+                } else {
+                    tracing::warn!(
+                        "SetWindowAppearance requested for unknown frame_id=0x{:x}",
+                        emacs_frame_id
+                    );
+                }
+            }
             WindowCommand::SetWindowVisibility { frame, visibility } => {
                 let emacs_frame_id = frame.raw_id();
                 if !self

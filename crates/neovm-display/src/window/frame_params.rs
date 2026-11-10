@@ -14,7 +14,7 @@ pub const GNU_FRAME_PARAM_COUNT: usize = 54;
 
 pub use neovm_value::display_vocab::FrameParam;
 
-pub use neovm_value::display_vocab::FrameFullscreen;
+pub use neovm_value::display_vocab::{FrameFullscreen, FrameNsAppearance};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]

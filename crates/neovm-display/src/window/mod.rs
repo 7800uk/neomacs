@@ -97,8 +97,8 @@ pub(crate) use display_ext::{
 pub use display::{WindowBufferDisplayDefaults, WindowFringeDefaults, WindowScrollBarDefaults};
 pub(crate) use display::{frame_config_scroll_bar_height, frame_config_scroll_bar_width};
 pub use frame_params::{
-    CursorTypeSymbol, FrameFullscreen, FrameParam, FrameParamKey, FrameToolBarPosition,
-    FrameZGroup, GNU_FRAME_PARAM_COUNT, GNU_FRAME_PARAMS,
+    CursorTypeSymbol, FrameFullscreen, FrameNsAppearance, FrameParam, FrameParamKey,
+    FrameToolBarPosition, FrameZGroup, GNU_FRAME_PARAM_COUNT, GNU_FRAME_PARAMS,
 };
 pub(crate) use neovm_eval::emacs_core::eval::data::window_layout_query::WindowLayoutQueryAdapter;
 pub use neovm_eval::emacs_core::eval::data::window_state::WindowScrollBarGeometry;

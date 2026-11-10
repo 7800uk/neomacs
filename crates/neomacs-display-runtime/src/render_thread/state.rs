@@ -460,6 +460,9 @@ pub(super) struct WindowChrome {
     pub(super) last_titlebar_click: Option<EventTime>,
     pub(super) is_fullscreen: bool,
     pub(super) corner_radius: f32,
+    /// The `ns-appearance` frame parameter; applied with the rest of the
+    /// native chrome once the window exists.
+    pub(super) appearance: crate::thread_comm::WindowAppearance,
 }
 
 impl Default for WindowChrome {
@@ -476,6 +479,7 @@ impl Default for WindowChrome {
             last_titlebar_click: None,
             is_fullscreen: false,
             corner_radius: 0.0,
+            appearance: crate::thread_comm::WindowAppearance::System,
         }
     }
 }

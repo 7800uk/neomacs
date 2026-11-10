@@ -2013,6 +2013,30 @@ pub fn builtin_modify_frame_parameters(
                                 )?;
                             }
                         }
+                        FrameParamKey::Known(FrameParam::NsAppearance) => {
+                            // Stored first, applied second, like `undecorated'
+                            // above: GNU's `ns_set_appearance' restyles the
+                            // window at once (src/nsterm.m:2130-2146).  Storing
+                            // without applying left a dark theme under a title
+                            // bar drawn for the light appearance.
+                            if let Some(frame) = eval.frame_manager_mut().get_mut(fid) {
+                                frame.set_known_parameter(FrameParam::NsAppearance, pair_cdr);
+                            }
+                            let is_top_level_gui =
+                                eval.frame_manager().get(fid).is_some_and(|frame| {
+                                    frame.effective_window_system().is_some()
+                                        && frame.parent_frame.as_frame_id().is_none()
+                                });
+                            if is_top_level_gui && let Some(host) = eval.display_host.as_mut() {
+                                host.set_gui_frame_ns_appearance(
+                                    fid,
+                                    neovm_value::display_vocab::FrameNsAppearance::from_symbol_value(
+                                        &pair_cdr,
+                                    ),
+                                )
+                                .map_err(|message| signal("error", vec![Value::string(message)]))?;
+                            }
+                        }
                         FrameParamKey::Known(FrameParam::NoAcceptFocus) => {
                             if let Some(frame) = eval.frame_manager_mut().get_mut(fid) {
                                 frame.no_accept_focus = pair_cdr.is_truthy();

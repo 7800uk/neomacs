@@ -3837,6 +3837,7 @@ dependencies = [
  "neomacs-webview",
  "neovm-core",
  "neovm-value",
+ "objc2-foundation",
  "rustix 1.1.4",
  "serde",
  "serde_json",

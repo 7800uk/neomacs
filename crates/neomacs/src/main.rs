@@ -6392,6 +6392,13 @@ fn initialize_system_locale() {
         .unwrap_or(false);
     let empty = std::ffi::CString::new("").expect("empty CString");
     let c_locale = std::ffi::CString::new("C").expect("\"C\" CString");
+    #[cfg(target_os = "macos")]
+    if !lc_all_is_c {
+        // GNU's NS build calls `ns_init_locale ()' immediately before the
+        // `setlocale (LC_ALL, "")' below, under the same LC_ALL guard
+        // (emacs.c:1648-1654).
+        initialize_macos_lang();
+    }
     unsafe {
         if !lc_all_is_c {
             // setlocale (LC_ALL, "") — pick up the environment's locale.
@@ -6406,6 +6413,63 @@ fn initialize_system_locale() {
 
 #[cfg(not(unix))]
 fn initialize_system_locale() {}
+
+/// The locale GNU's `ns_init_locale' falls back to when the one it derived
+/// cannot be installed (nsterm.m:592).
+#[cfg(any(target_os = "macos", test))]
+const MACOS_DEFAULT_LANG: &str = "en_US.UTF-8";
+
+/// The value GNU's `ns_init_locale' (nsterm.m:568-599) wants `LANG' to hold
+/// before it has been checked against the C library: the environment's own
+/// `LANG' when that is set and non-empty, otherwise the system locale's
+/// identifier with a UTF-8 codeset, e.g. "en_GB.UTF-8".
+///
+/// "macOS doesn't set any environment variables for the locale when run from
+/// the GUI", so without this an editor started from the Dock or Finder has no
+/// `LANG': `set-locale-environment' then derives no `locale-coding-system',
+/// and every child process runs in the "C" locale.
+#[cfg(any(target_os = "macos", test))]
+fn macos_lang_candidate(
+    env_lang: Option<&std::ffi::OsStr>,
+    system_locale_identifier: impl FnOnce() -> String,
+) -> std::ffi::OsString {
+    match env_lang {
+        Some(lang) if !lang.is_empty() => lang.to_os_string(),
+        _ => format!("{}.UTF-8", system_locale_identifier()).into(),
+    }
+}
+
+/// GNU `ns_init_locale': make sure `LANG' names a locale the C library can
+/// install, deriving it from the system locale when the environment has none.
+#[cfg(target_os = "macos")]
+fn initialize_macos_lang() {
+    use std::os::unix::ffi::OsStrExt as _;
+
+    let env_lang = std::env::var_os("LANG");
+    let candidate = macos_lang_candidate(env_lang.as_deref(), || {
+        objc2_foundation::NSLocale::currentLocale()
+            .localeIdentifier()
+            .to_string()
+    });
+    // "Check if LANG can be used for initializing the locale.  If not, use a
+    // default setting."  The caller's `setlocale (LC_ALL, "")' then installs
+    // the locale from the environment, as GNU's main does.
+    let usable = std::ffi::CString::new(candidate.as_bytes())
+        .ok()
+        .is_some_and(|c_lang| !unsafe { libc::setlocale(libc::LC_ALL, c_lang.as_ptr()) }.is_null());
+    let lang = if usable {
+        candidate
+    } else {
+        eprintln!(
+            "LANG={} cannot be used, using {MACOS_DEFAULT_LANG} instead.",
+            candidate.to_string_lossy()
+        );
+        MACOS_DEFAULT_LANG.into()
+    };
+    // SAFETY: this runs at the top of `main', before any thread exists that
+    // could read or write the environment concurrently.
+    unsafe { std::env::set_var("LANG", lang) };
+}
 
 #[cfg(test)]
 mod tests;

@@ -7494,3 +7494,26 @@ fn graphical_startup_exposes_only_initial_terminal_before_lisp_frame_creation() 
         "(nil nil neo t t nil nil (t))"
     );
 }
+
+/// GNU `ns_init_locale' (nsterm.m:575-584): "Either use LANG, if set, or try
+/// to construct LANG from NSLocale."  An empty `LANG' counts as unset.
+#[test]
+fn macos_lang_candidate_keeps_the_environment_and_derives_only_when_missing() {
+    use std::ffi::OsStr;
+
+    let system = || "en_GB".to_string();
+    assert_eq!(
+        super::super::macos_lang_candidate(None, system),
+        OsStr::new("en_GB.UTF-8")
+    );
+    assert_eq!(
+        super::super::macos_lang_candidate(Some(OsStr::new("")), system),
+        OsStr::new("en_GB.UTF-8")
+    );
+    assert_eq!(
+        super::super::macos_lang_candidate(Some(OsStr::new("fr_FR.ISO8859-1")), || {
+            panic!("the system locale is consulted only when LANG is missing")
+        }),
+        OsStr::new("fr_FR.ISO8859-1")
+    );
+}

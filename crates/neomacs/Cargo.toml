@@ -123,6 +123,10 @@ hostname.workspace = true
 [target.'cfg(unix)'.dependencies]
 rustix = { workspace = true, features = ["termios"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# `NSLocale' for GNU's `ns_init_locale' (LANG for GUI-launched sessions).
+objc2-foundation.workspace = true
+
 [target.'cfg(target_os = "linux")'.dependencies]
 tikv-jemalloc-sys = { version = "0.7", optional = true, default-features = false }
 

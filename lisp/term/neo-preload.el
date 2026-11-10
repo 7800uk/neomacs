@@ -25,6 +25,102 @@
 (when (eq system-type 'darwin)
   (global-set-key [?\s-q] #'save-buffers-kill-emacs))
 
+;; The rest of GNU's "Nextstep-like bindings for command key sequences"
+;; (`term/ns-win.el:107-173'), which its NS port also installs in the dump.
+;; Without them Cmd-C, Cmd-V, Cmd-S, Cmd-Z and the rest are undefined on
+;; macOS, where `ns-command-modifier' makes Command the `super' modifier.
+;;
+;; Left out, because each is bound in GNU to a command implemented by AppKit
+;; primitives this backend does not have, and a key bound to an undefined
+;; command only trades "s-p is undefined" for a `commandp' error: `s-C'
+;; (ns-popup-color-panel), `s-S' (ns-write-file-using-panel), `s-h'
+;; (ns-do-hide-emacs), `s-H' and `M-s-h' (ns-do-hide-others), `s-o'
+;; (ns-open-file-using-panel), `s-p' (ns-print-buffer) and `C-s-SPC'
+;; (ns-do-show-character-palette).  `s-=', `s-+', `s--' and `s-0' are left
+;; to `term/neo-win.el', which binds them at GUI start-up.
+(when (eq system-type 'darwin)
+  ;; GNU `term/ns-win.el:597-600'.
+  (defun ns-prev-frame ()
+    "Switch to previous visible frame."
+    (interactive)
+    (other-frame -1))
+
+  ;; GNU `term/ns-win.el:707-714'.
+  (defun ns-copy-including-secondary ()
+    (interactive)
+    (call-interactively 'kill-ring-save)
+    (gui-set-selection 'SECONDARY (buffer-substring (point) (mark t))))
+
+  (defun ns-paste-secondary ()
+    (interactive)
+    (insert (gui-get-selection 'SECONDARY)))
+
+  (define-key global-map [?\s-,] 'customize)
+  (define-key global-map [?\s-'] 'next-window-any-frame)
+  (define-key global-map [?\s-`] 'other-frame)
+  (define-key global-map [?\s-~] 'ns-prev-frame)
+  (define-key global-map [?\s-:] 'ispell)
+  (define-key global-map [?\s-?] 'info)
+  (define-key global-map [?\s-^] 'kill-some-buffers)
+  (define-key global-map [?\s-&] 'kill-current-buffer)
+  (define-key global-map [?\s-D] 'dired)
+  (define-key global-map [?\s-E] 'edit-abbrevs)
+  (define-key global-map [?\s-L] 'shell-command)
+  (define-key global-map [?\s-M] 'manual-entry)
+  (define-key global-map [?\s-a] 'mark-whole-buffer)
+  (define-key global-map [?\s-c] 'ns-copy-including-secondary)
+  (define-key global-map [?\s-d] 'isearch-repeat-backward)
+  (define-key global-map [?\s-e] 'isearch-yank-kill)
+  (define-key global-map [?\s-f] 'isearch-forward)
+  (define-key esc-map [?\s-f] 'isearch-forward-regexp)
+  (define-key global-map [?\s-F] 'isearch-backward)
+  (define-key esc-map [?\s-F] 'isearch-backward-regexp)
+  (define-key global-map [?\s-g] 'isearch-repeat-forward)
+  (define-key global-map [?\s-j] 'exchange-point-and-mark)
+  (define-key global-map [?\s-k] 'kill-current-buffer)
+  (define-key global-map [?\s-l] 'goto-line)
+  (define-key global-map [?\s-m] 'iconify-frame)
+  (define-key global-map [?\s-n] 'make-frame)
+  (define-key global-map [?\s-s] 'save-buffer)
+  (define-key global-map [?\s-t] 'menu-set-font)
+  (define-key global-map [?\s-u] 'revert-buffer)
+  (define-key global-map [?\s-v] 'yank)
+  (define-key global-map [?\s-w] 'delete-frame)
+  (define-key global-map [?\s-x] 'kill-region)
+  (define-key global-map [?\s-y] 'ns-paste-secondary)
+  (define-key global-map [?\s-z] 'undo)
+  (define-key global-map [?\s-|] 'shell-command-on-region)
+  (define-key global-map [s-kp-bar] 'shell-command-on-region)
+  (define-key global-map [s-right] 'move-end-of-line)
+  (define-key global-map [s-left] 'move-beginning-of-line)
+
+  ;; "Set some options to be as Nextstep-like as possible."
+  ;; (`term/ns-win.el:791-793'): a macOS window is titled with its buffer
+  ;; alone, not "BUFFER - PROGRAM at HOST".
+  (setq frame-title-format "%b"
+        icon-title-format "%b")
+
+  ;; "macOS-like defaults for trackpad and mouse wheel scrolling"
+  ;; (`term/ns-win.el:725-745').  GNU gates this on AppKit 1138 (macOS 10.7);
+  ;; every macOS this backend runs on is newer.  mwheel.el loads after this
+  ;; file, as it loads after ns-win.el in GNU, and its `defcustom' keeps a
+  ;; value that is already set.
+  (defvar mouse-wheel-progressive-speed)
+  (setq mouse-wheel-progressive-speed nil)
+  (put 'mouse-wheel-progressive-speed 'customized-value
+       (list (custom-quote (symbol-value 'mouse-wheel-progressive-speed))))
+
+  ;; GNU loads `term/ns-win.el' after isearch.el (`loadup.el:276' against
+  ;; `:356'); this file loads before it, so the two isearch maps do not exist
+  ;; yet and take their bindings when loadup reaches isearch.
+  (with-eval-after-load 'isearch
+    (define-key minibuffer-local-isearch-map [?\s-f]
+                'isearch-forward-exit-minibuffer)
+    (define-key isearch-mode-map [?\s-f] 'isearch-repeat-forward)
+    (define-key minibuffer-local-isearch-map [?\s-F]
+                'isearch-reverse-exit-minibuffer)
+    (define-key isearch-mode-map [?\s-F] 'isearch-repeat-backward)))
+
 ;; `x-gtk-use-system-tooltips' has no C declaration in any GNU build: it is an
 ;; alias that term/x-win.el installs onto the `use-system-tooltips' DEFVAR_BOOL
 ;; in src/frame.c (term/x-win.el:1572, and term/pgtk-win.el:372 for pgtk), and

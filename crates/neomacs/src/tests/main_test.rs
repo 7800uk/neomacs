@@ -4630,6 +4630,52 @@ fn neo_preload_binds_command_q_like_gnu_on_darwin() {
     assert_eq!(rendered, "(t)");
 }
 
+/// GNU's NS port preloads the whole "Nextstep-like bindings" table
+/// (lisp/term/ns-win.el:107-173), not only Cmd-Q.  Without it Cmd-C, Cmd-V,
+/// Cmd-S and Cmd-Z are undefined keys on macOS.
+#[test]
+fn neo_preload_binds_the_command_key_table_like_gnu_on_darwin() {
+    let mut eval = create_bootstrap_evaluator_cached_with_features(&["neomacs"])
+        .expect("cached bootstrap evaluator");
+
+    let rendered = eval
+        .eval_str(
+            r#"
+        (let* ((system-type 'darwin)
+               (keys '([?\s-c] [?\s-v] [?\s-s] [?\s-z] [?\s-x] [?\s-a]
+                       [?\s-w] [?\s-n] [?\s-f] [?\s-k] [?\s-y] [?\s-~]
+                       [s-left] [s-right]))
+               (original (mapcar (lambda (key) (lookup-key global-map key)) keys)))
+          (unwind-protect
+              (progn
+                (load "term/neo-preload.el" nil t)
+                (list (mapcar (lambda (key) (lookup-key global-map key)) keys)
+                      (lookup-key isearch-mode-map [?\s-f])
+                      (lookup-key minibuffer-local-isearch-map [?\s-F])
+                      ;; Every key the table binds must name a command.
+                      (seq-every-p #'commandp
+                                   (mapcar (lambda (key) (lookup-key global-map key))
+                                           keys))))
+            (dolist (key keys)
+              (define-key global-map key (pop original)))))
+        "#,
+        )
+        .map(|value| print_value_with_eval(&eval, &value))
+        .unwrap_or_else(|err| format!("{err:?}"));
+
+    assert_eq!(
+        rendered,
+        "((ns-copy-including-secondary yank save-buffer undo kill-region \
+          mark-whole-buffer delete-frame make-frame isearch-forward \
+          kill-current-buffer ns-paste-secondary ns-prev-frame \
+          move-beginning-of-line move-end-of-line) \
+          isearch-repeat-forward isearch-reverse-exit-minibuffer t)"
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+}
+
 #[test]
 fn neo_win_registers_neo_display_format() {
     let mut eval = create_bootstrap_evaluator_cached_with_features(&["neomacs"])
